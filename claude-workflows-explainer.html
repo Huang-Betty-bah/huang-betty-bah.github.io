@@ -1,1 +1,742 @@
-../shared-workflows/docs/claude-workflows-explainer.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude GitHub Workflows — How They Work</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --border: rgba(15, 23, 42, 0.09);
+    --text: #0f2a4a;
+    --text-dim: #5b6b82;
+
+    --primary: #2563eb;
+    --primary-dim: rgba(37, 99, 235, 0.08);
+    --secondary: #475569;
+    --tertiary: #ca8a04;
+    --danger: #dc2626;
+    --ok: #16a34a;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220;
+      --surface: #111c30;
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #dbe4f0;
+      --text-dim: #8ea3bf;
+
+      --primary: #60a5fa;
+      --primary-dim: rgba(96, 165, 250, 0.16);
+      --secondary: #94a3b8;
+      --tertiary: #fbbf24;
+      --danger: #f87171;
+      --ok: #4ade80;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg);
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 26px 26px;
+    color: var(--text);
+    font-family: var(--font-body);
+    padding: 40px;
+    min-height: 100vh;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate { animation: fadeUp 0.4s ease-out both; animation-delay: calc(var(--i, 0) * 0.06s); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  .container { max-width: 1040px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 6px;
+    text-wrap: balance;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    margin-bottom: 28px;
+  }
+
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+    margin: 40px 0 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  h2 .file {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-dim);
+  }
+
+  .description {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    max-width: 760px;
+  }
+  .description code, .callout code, li code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--primary-dim);
+    color: var(--primary);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* change banner */
+  .change {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--tertiary);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin-bottom: 8px;
+  }
+  .change h3 {
+    font-size: 13px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--tertiary);
+    margin-bottom: 10px;
+  }
+  .change ul { margin: 0; padding-left: 18px; }
+  .change li { font-size: 13.5px; line-height: 1.7; color: var(--text); margin-bottom: 4px; }
+  .change li::marker { color: var(--tertiary); }
+  .change .was { color: var(--text-dim); text-decoration: line-through; text-decoration-color: var(--danger); }
+
+  /* mermaid */
+  .mermaid-wrap {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 22px;
+    overflow: auto;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    cursor: grab;
+  }
+  .mermaid-wrap.is-panning { cursor: grabbing; user-select: none; }
+
+  .zoom-controls {
+    position: absolute;
+    top: 8px; right: 8px;
+    display: flex; gap: 2px; z-index: 10;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px;
+  }
+  .zoom-controls button {
+    width: 28px; height: 28px; border: none;
+    background: transparent; color: var(--text-dim);
+    font-family: var(--font-mono); font-size: 14px;
+    cursor: pointer; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .zoom-controls button:hover { background: var(--border); color: var(--text); }
+
+  .diagram-shell { position: relative; }
+  .diagram-shell__hint {
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--text-dim);
+    margin-bottom: 8px; opacity: 0.7;
+  }
+  .mermaid-viewport {
+    position: relative; overflow: hidden;
+    width: 100%; height: 100%; min-height: 300px;
+  }
+  .mermaid-canvas { position: absolute; top: 0; left: 0; }
+  .zoom-label {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-dim); padding: 0 6px; white-space: nowrap;
+  }
+
+  .mermaid .nodeLabel { font-family: var(--font-body) !important; font-size: 15px !important; }
+  .mermaid .edgeLabel { font-family: var(--font-mono) !important; font-size: 12px !important; }
+  .mermaid .cluster rect { rx: 10px; ry: 10px; }
+  .mermaid .node rect, .mermaid .node circle, .mermaid .node polygon { stroke-width: 1.5px !important; }
+  .mermaid .edge-pattern-solid { stroke-width: 1.5px !important; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+  }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    font-size: 13px; line-height: 1.65;
+    color: var(--text-dim);
+    margin-top: 16px;
+  }
+  .callout strong { color: var(--text); }
+
+  /* setup / IAM section */
+  .setup h3 {
+    font-size: 13px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--primary);
+    margin: 24px 0 8px;
+  }
+  .setup p { font-size: 13.5px; line-height: 1.7; color: var(--text-dim); margin-bottom: 8px; max-width: 780px; }
+  .setup p strong { color: var(--text); }
+  .setup ol { margin: 0 0 12px 18px; }
+  .setup ol li { font-size: 13.5px; line-height: 1.7; color: var(--text-dim); margin-bottom: 4px; }
+  .codeblock {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+  }
+  .codeblock code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    display: block;
+  }
+  .codeblock .cmt { color: var(--text-dim); }
+  .setup .warn {
+    border-left-color: var(--tertiary);
+  }
+
+  @media (max-width: 768px) {
+    body { padding: 16px; }
+    h1 { font-size: 24px; }
+    .mermaid-wrap { padding: 16px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <p class="eyebrow animate" style="--i:0">shared-workflows &middot; .github/workflows</p>
+  <h1 class="animate" style="--i:1">Claude GitHub Workflows</h1>
+  <p class="subtitle animate" style="--i:2">two reusable workflow_call pipelines &mdash; a comment-driven reviewer and a human-approval gate</p>
+
+  <div class="change animate" style="--i:3">
+    <h3>What changed in claude-pr-review.yaml</h3>
+    <ul>
+      <li>The first review is <strong>comment-triggered</strong>: comment <code>ai review</code> on a PR to summon the full multi-lens review (phrase configurable via <code>TRIGGER_PHRASE</code>).</li>
+      <li class="was">Removed: automatic run on <code>pull_request</code> opened / reopened / base-retarget.</li>
+      <li><strong>Opt-in auto re-review:</strong> once a PR has an <code>ai review</code> comment, each new commit (<code>synchronize</code>) auto-runs the incremental re-review. PRs nobody asked to review are left alone.</li>
+      <li>A small <code>check-optin</code> job scans the PR's comments for the trigger phrase and gates the <code>re-review</code> job via <code>needs</code>.</li>
+      <li>Kept: the <code>@claude</code> <code>comment-trigger</code> job for general ad-hoc questions.</li>
+      <li>New step checks out the PR head (<code>gh pr checkout</code>) since comment events default to the base branch.</li>
+    </ul>
+  </div>
+
+  <!-- ============ WORKFLOW 1 ============ -->
+  <h2 class="animate" style="--i:4">1. Claude PR Review <span class="file">claude-pr-review.yaml</span></h2>
+  <p class="description animate" style="--i:5">
+    A reusable workflow the calling repo wires to <code>issue_comment</code>, <code>pull_request_review_comment</code>,
+    and <code>pull_request (synchronize)</code> events. A comment is routed by content: <code>ai review</code> starts a
+    structured multi-lens review of the PR head, <code>@claude</code> runs a lightweight general assistant. A new commit
+    triggers an auto re-review, but only if the PR was previously opted in with an <code>ai review</code> comment.
+  </p>
+
+  <div class="legend animate" style="--i:6">
+    <div class="legend-item"><div class="legend-swatch" style="background:#dbeafe"></div> Automated step</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fef3c7"></div> Decision / routing</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#dcfce7"></div> Result posted</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e5e7eb"></div> No job runs</div>
+  </div>
+
+  <section class="diagram-shell animate" style="--i:7">
+    <p class="diagram-shell__hint">Ctrl/Cmd + wheel to zoom &middot; scroll to pan &middot; drag when zoomed &middot; double-click to fit &middot; &#x26F6; opens full size.</p>
+    <div class="mermaid-wrap">
+      <div class="zoom-controls">
+        <button type="button" data-action="zoom-in" title="Zoom in">+</button>
+        <button type="button" data-action="zoom-out" title="Zoom out">&minus;</button>
+        <button type="button" data-action="zoom-fit" title="Smart fit">&#8634;</button>
+        <button type="button" data-action="zoom-one" title="1:1 zoom">1:1</button>
+        <button type="button" data-action="zoom-expand" title="Open full size">&#x26F6;</button>
+        <span class="zoom-label">Loading...</span>
+      </div>
+      <div class="mermaid-viewport"><div class="mermaid mermaid-canvas"></div></div>
+    </div>
+    <script type="text/plain" class="diagram-source">
+      flowchart TD
+        C["Comment created<br/>issue_comment / pull_request_review_comment"] --> R{"What does the<br/>comment body contain?"}
+        R -->|"'ai review'<br/>(and comment is on a PR)"| FR
+        R -->|"'@claude'"| CT
+        R -->|"neither"| X["No job runs"]
+
+        NC["New commit pushed<br/>pull_request: synchronize"] --> CO["check-optin job<br/>scan PR comments for 'ai review'"]
+        CO --> OI{"PR opted in?<br/>(any human 'ai review' comment)"}
+        OI -->|"no"| X2["No re-review<br/>PR left alone"]
+        OI -->|"yes<br/>(needs: check-optin)"| RR
+
+        subgraph FRJOB["full-review &mdash; multi-lens review"]
+          direction TB
+          FR["Resolve PR number<br/>issue.number / pull_request.number"] --> F2["Checkout PR head<br/>gh pr checkout"]
+          F2 --> F3["AWS OIDC &rarr; Bedrock"]
+          F3 --> F4["Get changed files<br/>gh api .../pulls/N/files"]
+          F4 --> F5["claude-code-action<br/>read pr-review.md, fan out lens subagents"]
+          F5 --> F6["Post inline comments +<br/>single verdict review"]
+        end
+
+        subgraph RRJOB["re-review &mdash; incremental, on new commit"]
+          direction TB
+          RR["Fetch previous bot review<br/>(BOT_LOGIN_PATTERN)"] --> RRD{"Prior review state?"}
+          RRD -->|"CHANGES_REQUESTED"| RV["Verify prior findings<br/>vs scoped incremental diff<br/>&rarr; approve / request-changes"]
+          RRD -->|"APPROVED"| RL["Lightweight review<br/>of new commits only"]
+          RRD -->|"none found"| RFB["Fallback: full multi-lens review"]
+        end
+
+        subgraph CTJOB["comment-trigger &mdash; general @claude"]
+          direction TB
+          CT["Checkout repo"] --> G2["AWS OIDC &rarr; Bedrock"]
+          G2 --> G3["claude-code-action<br/>answer the comment"]
+        end
+
+        classDef decision fill:#fef3c7,stroke:#ca8a04,color:#713f12;
+        classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d;
+        classDef skip fill:#e5e7eb,stroke:#9ca3af,color:#374151;
+        class R,OI,RRD decision
+        class F6,RV,RL,RFB,G3 ok
+        class X,X2 skip
+    </script>
+  </section>
+
+  <div class="callout animate" style="--i:8">
+    <strong>Why opt-in?</strong> The first review only runs when a human asks (<code>ai review</code>), so untouched PRs
+    cost no model time. But once a PR is opted in, each new commit auto-re-reviews it &mdash; the <code>check-optin</code>
+    job enforces that gate. <code>concurrency</code> is keyed per PR number, so a newer <code>ai review</code> or push
+    supersedes an in-flight run instead of stacking duplicates. Model traffic stays on Bedrock via OIDC &mdash; no API keys
+    in the steps. The <code>@claude</code> branch is a separate general-assistant job, independent of the review path.
+  </div>
+
+  <div class="callout animate" style="--i:8">
+    <strong><code>BOT_LOGIN_PATTERN</code> &mdash; re-review only.</strong> A jq regex the <code>re-review</code> job uses to
+    find <em>its own</em> previous review among all the PR's reviews (<code>.user.login | test(pattern)</code>), so it knows
+    whether it last said <code>CHANGES_REQUESTED</code> (verify those findings) or <code>APPROVED</code> (lightweight review),
+    and can read that review's body + commit SHA. Default <code>(?i)^github-actions(\[bot\])?$</code> matches the
+    <code>github-actions[bot]</code> account the workflow posts as when using the default <code>GITHUB_TOKEN</code>.
+    <strong>You don't need to set this</strong> &mdash; only override it if reviews run under a dedicated GitHub App with a
+    different login. If it matches nothing (or the first review hasn't posted yet), re-review safely falls back to a full review.
+  </div>
+
+  <!-- ============ WORKFLOW 2 ============ -->
+  <h2 class="animate" style="--i:9">2. Human Approval Gate <span class="file">claude-human-approval-gate.yaml</span></h2>
+  <p class="description animate" style="--i:10">
+    Keeps a required commit status (<code>Claude / human-approval-required</code>) current so a bot approval can never
+    merge <strong>any</strong> PR. Branch protection requires this status; the bot never grants the human approval that
+    satisfies it. It re-evaluates on every review event and on PR open/reopen/synchronize.
+  </p>
+
+  <div class="change animate" style="--i:10">
+    <h3>Now always-on &mdash; bot approval is never sufficient</h3>
+    <ul>
+      <li class="was">Removed: the <code>requires-human-review</code> label opt-in (and the <code>GATE_LABEL</code> input). PRs no longer default to <code>success</code> when unlabeled.</li>
+      <li><strong>Every PR</strong> now requires <strong>&ge; 1 human <code>APPROVED</code> review</strong> to reach <code>success</code>. No human approval &rarr; <code>failure</code> &rarr; merge blocked.</li>
+      <li>Reviews authored by bots/apps (<code>user.type == "Bot"</code>, e.g. the Claude reviewer posting as <code>github-actions</code>) are filtered out, so a bot <code>APPROVE</code> never counts.</li>
+      <li>Runs on PR <code>opened</code>/<code>reopened</code>/<code>synchronize</code> too, so the required check starts out <em>failing</em> and re-attaches to each new HEAD commit &mdash; you can't merge until a real human approves.</li>
+    </ul>
+  </div>
+
+  <div class="legend animate" style="--i:11">
+    <div class="legend-item"><div class="legend-swatch" style="background:#dbeafe"></div> Automated step</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fef3c7"></div> Decision</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#dcfce7"></div> success (merge allowed)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#fee2e2"></div> failure (merge blocked)</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#e5e7eb"></div> ignored / no run</div>
+  </div>
+
+  <section class="diagram-shell animate" style="--i:12">
+    <p class="diagram-shell__hint">Ctrl/Cmd + wheel to zoom &middot; scroll to pan &middot; drag when zoomed &middot; double-click to fit &middot; &#x26F6; opens full size.</p>
+    <div class="mermaid-wrap">
+      <div class="zoom-controls">
+        <button type="button" data-action="zoom-in" title="Zoom in">+</button>
+        <button type="button" data-action="zoom-out" title="Zoom out">&minus;</button>
+        <button type="button" data-action="zoom-fit" title="Smart fit">&#8634;</button>
+        <button type="button" data-action="zoom-one" title="1:1 zoom">1:1</button>
+        <button type="button" data-action="zoom-expand" title="Open full size">&#x26F6;</button>
+        <span class="zoom-label">Loading...</span>
+      </div>
+      <div class="mermaid-viewport"><div class="mermaid mermaid-canvas"></div></div>
+    </div>
+    <script type="text/plain" class="diagram-source">
+      flowchart TD
+        E["Event:<br/>pull_request (opened / reopened / synchronize)<br/>OR pull_request_review (submitted / edited / dismissed)"] --> J["reevaluate job<br/>runs on EVERY PR"]
+        J --> Q["List PR reviews<br/>gh api .../pulls/N/reviews"]
+        Q --> F["Filter: state == APPROVED<br/>AND user.type != 'Bot'"]
+        F --> BOT["Bot / app APPROVE reviews<br/>ignored &mdash; never counted"]
+        F --> H{">= 1 human<br/>APPROVED review?"}
+        H -->|"Yes"| S2["Result: SUCCESS<br/>'Human approval received'<br/>&rarr; check turns green, merge allowed"]
+        H -->|"No"| S3["Result: FAILURE<br/>'bot approval never sufficient'<br/>&rarr; check turns red, merge blocked"]
+        S2 --> P["POST commit status to HEAD sha<br/>(records the SUCCESS or FAILURE result)<br/>context: Claude / human-approval-required"]
+        S3 --> P
+
+        classDef decision fill:#fef3c7,stroke:#ca8a04,color:#713f12;
+        classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d;
+        classDef fail fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+        classDef skip fill:#e5e7eb,stroke:#9ca3af,color:#374151;
+        class H decision
+        class S2 ok
+        class S3 fail
+        class BOT skip
+    </script>
+  </section>
+
+  <div class="callout animate" style="--i:13">
+    <strong>How they fit together.</strong> The reviewer posts findings and a verdict for extra signal, but it can never
+    merge anything on its own: the gate applies to <em>every</em> PR and blocks merge until a real human submits an
+    <code>APPROVED</code> review. The bot's own approval is filtered out by <code>user.type != "Bot"</code>, so a wrong bot
+    <code>APPROVE</code> is never sufficient &mdash; which is what makes a blocking AI review safe.
+  </div>
+
+  <!-- ============ BEDROCK SETUP ============ -->
+  <h2 class="animate" style="--i:14">3. Bedrock setup &amp; required IAM <span class="file">runner role &middot; SRE/DevOps</span></h2>
+  <p class="description animate" style="--i:15">
+    Both workflows are model-on-Bedrock only. Each run authenticates with GitHub OIDC, assumes the runner role
+    <code>arn:aws:iam::833328140030:role/gha-runner-role-us-east-1</code>, and calls the model in <code>us-east-1</code>
+    through the US cross-region inference profile <code>us.anthropic.claude-sonnet-4-6</code> (routes to <code>us-east-1</code>
+    and <code>us-west-2</code>). Three things must be in place, all owned by SRE/DevOps.
+  </p>
+
+  <section class="setup animate" style="--i:16">
+    <h3>1. IAM invoke policy on the runner role</h3>
+    <p>Two statements: the first lets the role call the inference profile; the second lets the profile invoke the
+    underlying foundation model in <strong>each region it can route to</strong>. Omitting the second statement is the usual
+    cause of <code>AccessDeniedException</code> even when the profile call looks allowed. <code>InvokeModelWithResponseStream</code>
+    is required because the action streams.</p>
+    <div class="codeblock"><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeClaudeInferenceProfile",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "arn:aws:bedrock:us-east-1:833328140030:inference-profile/us.anthropic.claude-sonnet-4-6"
+    },
+    {
+      "Sid": "InvokeClaudeFoundationModelsInRoutedRegions",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6"
+      ],
+      "Condition": {
+        "StringLike": {
+          "bedrock:InferenceProfileArn": "arn:aws:bedrock:us-east-1:833328140030:inference-profile/us.anthropic.claude-sonnet-4-6"
+        }
+      }
+    }
+  ]
+}</code></div>
+
+    <h3>2. Enable Bedrock model access (account-level, separate from IAM)</h3>
+    <p>In the Bedrock console &rarr; <strong>Model access</strong>, grant access to <strong>Anthropic Claude Sonnet 4.6</strong>
+    in <code>us-east-1</code> <em>and</em> <code>us-west-2</code>. Without this, invoke fails regardless of the IAM policy above.</p>
+
+    <h3>3. OIDC trust must cover the calling repos</h3>
+    <p>These are reusable (<code>workflow_call</code>) workflows invoked from other repos with <code>secrets: inherit</code>.
+    When a reusable workflow runs, the OIDC token's claims reflect the <strong>calling</strong> repo, not
+    <code>shared-workflows</code>. Confirm the role's trust policy permits those repos:</p>
+    <div class="codeblock"><code>{
+  "Effect": "Allow",
+  "Principal": { "Federated": "arn:aws:iam::833328140030:oidc-provider/token.actions.githubusercontent.com" },
+  "Action": "sts:AssumeRoleWithWebIdentity",
+  "Condition": {
+    "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+    "StringLike": { "token.actions.githubusercontent.com:sub": "repo:FootprintRecreation/*" }
+  }
+}</code></div>
+
+    <h3>Smoke test (run as the role in us-east-1)</h3>
+    <div class="codeblock"><code>aws bedrock-runtime invoke-model \
+  --region us-east-1 \
+  --model-id us.anthropic.claude-sonnet-4-6 \
+  --body '{"anthropic_version":"bedrock-2023-05-31","max_tokens":16,"messages":[{"role":"user","content":"ping"}]}' \
+  /dev/stdout</code></div>
+  </section>
+
+  <div class="callout warn animate" style="--i:17">
+    <strong>Confirm before shipping.</strong> The exact inference-profile ID (<code>us.anthropic.claude-sonnet-4-6</code>)
+    should be verified with <code>aws bedrock list-inference-profiles --region us-east-1</code> &mdash; some IDs carry a
+    <code>-vN:M</code> suffix, and a wrong ID both breaks the workflow and mis-scopes these ARNs. The base model ID must
+    match the <code>MODEL</code> input default in <code>claude-pr-review.yaml</code>.
+  </div>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  import elkLayouts from 'https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk/dist/mermaid-layout-elk.esm.min.mjs';
+
+  const config = {
+    fitPadding: 28, minHeight: 360, maxHeightPx: 1100, maxHeightVh: 0.86,
+    maxInitialZoom: 1.8, minZoom: 0.08, maxZoom: 6.5, zoomStep: 0.14, readabilityFloor: 0.58
+  };
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+  let activeDrag = null;
+  addEventListener('mousemove', (e) => activeDrag?.onMove(e));
+  addEventListener('mouseup', () => { activeDrag?.onEnd(); activeDrag = null; });
+
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+
+  mermaid.registerLayoutLoaders(elkLayouts);
+  mermaid.initialize({
+    startOnLoad: false, theme: 'base', look: 'classic', layout: 'elk',
+    themeVariables: {
+      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+      fontSize: '15px',
+      primaryColor: isDark ? '#1e3a5f' : '#dbeafe',
+      primaryBorderColor: isDark ? '#60a5fa' : '#2563eb',
+      primaryTextColor: isDark ? '#dbe4f0' : '#0f2a4a',
+      secondaryColor: isDark ? '#1e293b' : '#e2e8f0',
+      secondaryBorderColor: isDark ? '#94a3b8' : '#475569',
+      secondaryTextColor: isDark ? '#dbe4f0' : '#0f2a4a',
+      tertiaryColor: isDark ? '#3a2f14' : '#fef3c7',
+      tertiaryBorderColor: isDark ? '#fbbf24' : '#ca8a04',
+      tertiaryTextColor: isDark ? '#dbe4f0' : '#713f12',
+      lineColor: isDark ? '#8ea3bf' : '#5b6b82',
+      clusterBkg: isDark ? 'rgba(96,165,250,0.06)' : 'rgba(37,99,235,0.05)',
+      clusterBorder: isDark ? 'rgba(148,163,184,0.35)' : 'rgba(71,85,105,0.35)',
+      noteBkgColor: isDark ? '#1e3a5f' : '#fefce8',
+      noteTextColor: isDark ? '#dbe4f0' : '#0f2a4a',
+      noteBorderColor: isDark ? '#fbbf24' : '#ca8a04',
+    }
+  });
+
+  function initDiagram(shell) {
+    const wrap = shell.querySelector('.mermaid-wrap');
+    const viewport = shell.querySelector('.mermaid-viewport');
+    const canvas = shell.querySelector('.mermaid-canvas');
+    const source = shell.querySelector('.diagram-source');
+    const label = shell.querySelector('.zoom-label');
+    if (!wrap || !viewport || !canvas || !source || !label) return;
+
+    let zoom = 1, fitMode = 'contain', panX = 0, panY = 0, svgW = 0, svgH = 0;
+    let sx = 0, sy = 0, spx = 0, spy = 0, touchDist = 0, touchCx = 0, touchCy = 0;
+
+    function constrainPan() {
+      const vpW = viewport.clientWidth, vpH = viewport.clientHeight;
+      const rW = svgW * zoom, rH = svgH * zoom, pad = config.fitPadding;
+      panX = (rW + pad * 2 <= vpW) ? (vpW - rW) / 2 : clamp(panX, vpW - rW - pad, pad);
+      panY = (rH + pad * 2 <= vpH) ? (vpH - rH) / 2 : clamp(panY, vpH - rH - pad, pad);
+    }
+    function applyTransform() {
+      const svg = canvas.querySelector('svg');
+      if (!svg || !svgW) return;
+      constrainPan();
+      svg.style.width = (svgW * zoom) + 'px';
+      svg.style.height = (svgH * zoom) + 'px';
+      canvas.style.transform = `translate(${panX}px, ${panY}px)`;
+      label.textContent = Math.round(zoom * 100) + '% \u2014 ' + fitMode;
+    }
+    function canPan() {
+      const rW = svgW * zoom, rH = svgH * zoom;
+      return rW + config.fitPadding * 2 > viewport.clientWidth || rH + config.fitPadding * 2 > viewport.clientHeight;
+    }
+    function computeSmartFit() {
+      const vpW = viewport.clientWidth, vpH = viewport.clientHeight;
+      const aW = Math.max(80, vpW - config.fitPadding * 2), aH = Math.max(80, vpH - config.fitPadding * 2);
+      const contain = Math.min(aW / svgW, aH / svgH);
+      let z = contain, mode = 'contain';
+      if (contain < config.readabilityFloor) {
+        const chartR = svgH / svgW, vpR = vpH / Math.max(vpW, 1);
+        if (chartR >= vpR) { z = aW / svgW; mode = 'width-priority'; }
+        else { z = aH / svgH; mode = 'height-priority'; }
+      }
+      return { zoom: clamp(z, config.minZoom, config.maxInitialZoom), mode };
+    }
+    function fitDiagram() {
+      if (!svgW) return;
+      const fit = computeSmartFit();
+      zoom = fit.zoom; fitMode = fit.mode;
+      panX = (viewport.clientWidth - svgW * zoom) / 2;
+      panY = (viewport.clientHeight - svgH * zoom) / 2;
+      applyTransform();
+    }
+    function setOneToOne() {
+      zoom = clamp(1, config.minZoom, config.maxZoom); fitMode = '1:1';
+      panX = (viewport.clientWidth - svgW * zoom) / 2;
+      panY = (viewport.clientHeight - svgH * zoom) / 2;
+      applyTransform();
+    }
+    function zoomAround(factor, cx, cy) {
+      const next = clamp(zoom * factor, config.minZoom, config.maxZoom);
+      const ratio = next / zoom;
+      panX = cx - ratio * (cx - panX); panY = cy - ratio * (cy - panY);
+      zoom = next; fitMode = 'custom'; applyTransform();
+    }
+    function readSvgNaturalSize(svg) {
+      let w = 0, h = 0;
+      if (svg.viewBox?.baseVal?.width > 0) { w = svg.viewBox.baseVal.width; h = svg.viewBox.baseVal.height; }
+      if (!w) { w = parseFloat(svg.getAttribute('width')) || 0; h = parseFloat(svg.getAttribute('height')) || 0; }
+      if (!w) { const b = svg.getBBox(); w = b.width; h = b.height; }
+      if (!w) { const r = svg.getBoundingClientRect(); w = r.width || 1000; h = r.height || 700; }
+      if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      return { w, h };
+    }
+    function setAdaptiveHeight() {
+      if (!svgW) return;
+      const usableW = Math.max(280, wrap.getBoundingClientRect().width - 2);
+      const idealH = (svgH / svgW) * usableW + config.fitPadding * 2;
+      const maxVp = Math.floor(innerHeight * config.maxHeightVh);
+      const hardMax = Math.min(config.maxHeightPx, Math.max(config.minHeight + 40, maxVp));
+      wrap.style.height = Math.round(clamp(idealH, config.minHeight, hardMax)) + 'px';
+    }
+    function openInNewTab() {
+      const svg = canvas.querySelector('svg');
+      if (!svg) return;
+      const clone = svg.cloneNode(true);
+      clone.style.width = ''; clone.style.height = '';
+      const bg = isDark ? '#0b1220' : '#f4f6fb';
+      const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Diagram</title><style>
+      body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:${bg};padding:40px;box-sizing:border-box}
+      svg{max-width:100%;max-height:90vh;height:auto}</style></head><body>${clone.outerHTML}</body></html>`;
+      open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+    }
+    async function render() {
+      try {
+        const code = source.textContent.trim();
+        if (!code) { label.textContent = 'Error: Empty source'; return; }
+        const id = 'diagram-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        const { svg } = await mermaid.render(id, code);
+        const parsed = new DOMParser().parseFromString(svg, 'text/html');
+        const parsedSvg = parsed.body.querySelector('svg');
+        if (!parsedSvg) { label.textContent = 'Error: No SVG'; return; }
+        canvas.replaceChildren(document.adoptNode(parsedSvg));
+        const svgNode = canvas.querySelector('svg');
+        if (!svgNode) { label.textContent = 'Error: No SVG'; return; }
+        const size = readSvgNaturalSize(svgNode);
+        svgW = size.w; svgH = size.h;
+        svgNode.removeAttribute('width'); svgNode.removeAttribute('height');
+        svgNode.style.maxWidth = 'none'; svgNode.style.display = 'block';
+        setAdaptiveHeight(); fitDiagram();
+      } catch (err) {
+        console.error('Mermaid render failed:', err);
+        label.textContent = 'Error: ' + (err.message || 'Render failed');
+      }
+    }
+
+    const actions = {
+      'zoom-in': () => zoomAround(1 + config.zoomStep, viewport.clientWidth / 2, viewport.clientHeight / 2),
+      'zoom-out': () => zoomAround(1 / (1 + config.zoomStep), viewport.clientWidth / 2, viewport.clientHeight / 2),
+      'zoom-fit': fitDiagram, 'zoom-one': setOneToOne, 'zoom-expand': openInNewTab
+    };
+    Object.entries(actions).forEach(([action, handler]) => {
+      wrap.querySelector(`[data-action="${action}"]`)?.addEventListener('click', handler);
+    });
+
+    viewport.addEventListener('dblclick', fitDiagram);
+    viewport.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const factor = e.deltaY < 0 ? 1 + config.zoomStep : 1 / (1 + config.zoomStep);
+        zoomAround(factor, e.clientX - rect.left, e.clientY - rect.top);
+        return;
+      }
+      if (canPan()) { e.preventDefault(); panX -= e.deltaX; panY -= e.deltaY; applyTransform(); }
+    }, { passive: false });
+
+    viewport.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.zoom-controls') || !canPan()) return;
+      wrap.classList.add('is-panning');
+      sx = e.clientX; sy = e.clientY; spx = panX; spy = panY; e.preventDefault();
+      activeDrag = {
+        onMove: (ev) => { panX = spx + (ev.clientX - sx); panY = spy + (ev.clientY - sy); applyTransform(); },
+        onEnd: () => { wrap.classList.remove('is-panning'); }
+      };
+    });
+
+    viewport.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; spx = panX; spy = panY; }
+      else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchDist = Math.sqrt(dx * dx + dy * dy);
+        const r = viewport.getBoundingClientRect();
+        touchCx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+        touchCy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      }
+    }, { passive: true });
+
+    viewport.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && canPan()) {
+        if (touchDist > 0) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; spx = panX; spy = panY; touchDist = 0; }
+        e.preventDefault();
+        panX = spx + (e.touches[0].clientX - sx); panY = spy + (e.touches[0].clientY - sy); applyTransform();
+      } else if (e.touches.length === 2 && touchDist > 0) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        zoomAround(d / touchDist, touchCx, touchCy); touchDist = d;
+      }
+    }, { passive: false });
+
+    new ResizeObserver(() => { if (svgW) { setAdaptiveHeight(); fitDiagram(); } }).observe(wrap);
+    render();
+  }
+
+  document.querySelectorAll('.diagram-shell').forEach(initDiagram);
+</script>
+</body>
+</html>
